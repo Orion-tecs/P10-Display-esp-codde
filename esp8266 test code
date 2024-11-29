@@ -1,0 +1,149 @@
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+
+#include <SPI.h>
+#include <DMD2.h>
+#include <fonts/Arial14.h>
+//#include <fonts/arial_8.h>
+//#include <fonts/arialRounded_9.h>
+//#include <fonts/arial_11.h>
+//#include <fonts/arial_13.h>
+#include <fonts/Arial_black_16.h>
+#include <fonts/Droid_Sans_12.h>
+#include <fonts/Droid_Sans_16.h>
+//#include <fonts/comicSans_14.h>
+#include <fonts/SystemFont5x7.h>
+//#include <fonts/angka_2.h>
+//#include <fonts/OCRA.h>
+//#include <fonts/calibri9.h>
+//#include <fonts/mvboli.h>
+//#include <fonts/jamfont.h>
+//#include <fonts/seorgeScript_10.h 
+String webPage = "";
+const char MAIN_page[] PROGMEM = R"=====(
+<!DOCTYPE html>
+<html>
+   <head>
+      <title>Select Box Control</title>
+   </head>
+   <body>
+   <center>
+      <h1>Matrix Display Controller<h1> 
+       Enter Text :<br><br>  
+      <form action="/action_page">
+      <input type="text" name="msg" value="Enter your text here">
+      <br><br>
+         <select name = "dropdown">
+            <option value = "S1" selected>Style1</option>
+            <option value = "S2">Style2</option>
+            <option value = "S3">Style3</option>
+         </select>
+         <br><br>        
+        <input type="submit" value="Submit">         
+      </form>
+   </body>
+</html>
+)=====";
+
+//SSID and Password of your WiFi router
+const char* ssid = "Orion";
+const char* password = "orion3454";
+
+ESP8266WebServer server(80); //Server on port 80
+
+// Set Width and Hight to the number of displays you have
+const int WIDTH = 2;
+const int HIGHT = 1;
+//uint8_t *FONT = Arial14;
+
+/*
+  Pin Defination
+   nOE - GPIO5
+   A - GPIO16
+   B - GPIO2
+   CLK - GPIO14
+   SCLK - GPIO12
+   r/Data - GPIO13
+ */
+SPIDMD dmd(WIDTH , HIGHT, 5, 16, 4, 12);  //2 DMD controls the entire display
+//SPIDMD dmd(WIDTH , HIGHT, 2, 1, 32, 16); 
+//DMD_TextBox box(dmd, 2, 1, 32, 16);
+DMD_TextBox box(dmd);  // "box" provides a text box to automatically write to/scroll the display
+char MESSAGE[1024]; //Store the message
+char STYLE[10];
+void handleRoot() 
+   {
+      String s = MAIN_page; //Read HTML contents
+      server.send(200, "text/html", s); //Send web page
+   }
+
+void handleForm() 
+   {
+      String msg = server.arg("msg"); 
+      String style = server.arg("dropdown");
+      int style_len = style.length() + 1; 
+      int msg_len = msg.length() + 1; 
+      MESSAGE[msg_len];
+      STYLE[style_len];
+      if(style=="S1")
+        {
+            dmd.selectFont(Arial14);
+        }
+      else if(style=="S2")
+        {
+            dmd.selectFont(SystemFont5x7);
+        }      
+      else if(style=="S3")
+        {
+            dmd.selectFont(Droid_Sans_16);
+        }           
+      msg.toCharArray(MESSAGE, msg_len);
+      style.toCharArray(STYLE,style_len);
+      String s = MAIN_page;
+      server.send(200, "text/html", s); 
+  //Scroll();
+   }
+
+void Scroll(){
+  const char *next = MESSAGE;
+  dmd.begin();
+  while(*next) {
+    Serial.print(*next);
+    box.print(*next);
+    delay(200);
+    next++;
+  }  
+  dmd.end();
+}
+
+void setup(void)
+  {
+      Serial.begin(9600);
+      WiFi.begin(ssid, password);     //Connect to your WiFi router
+      Serial.println("");
+      while (WiFi.status() != WL_CONNECTED) 
+        {
+            delay(500);
+            Serial.print(".");
+        }
+      //If connection successful show IP address in serial monitor
+      Serial.println("");
+      Serial.print("Connected to ");
+      Serial.println("WiFi");
+      Serial.print("IP address: ");
+      Serial.println(WiFi.localIP());  //IP address assigned to your ESP
+      server.on("/", handleRoot);      //Which routine to handle at root location
+      server.on("/action_page", handleForm); //form action is handled here
+      server.begin();                  //Start server
+      Serial.println("HTTP server started");
+      dmd.setBrightness(255);
+      //dmd.selectFont(FONT);
+      
+  }
+
+void loop(void)
+  {
+      server.handleClient();          //Handle client requests
+      Scroll();
+  }
